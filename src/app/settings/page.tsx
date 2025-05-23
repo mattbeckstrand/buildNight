@@ -4,11 +4,13 @@ import AuthGuard from "@/components/AuthGuard";
 import UserInfo from "@/components/UserInfo";
 import { supabase } from "@/utils/supabaseClient";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 interface Photo {
   id: string;
-  url: string;
+  url: string; // now just the file path
+  signedUrl?: string;
 }
 
 const mockGoogleAccount = {
@@ -23,6 +25,21 @@ export default function SettingsPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+
+  // Helper to get signed URLs for all photos
+  const getSignedUrls = async (photos: Photo[]) => {
+    const signedPhotos = await Promise.all(
+      photos.map(async (photo) => {
+        if (!photo.url) return photo;
+        const { data } = await supabase.storage
+          .from("profile-photos")
+          .createSignedUrl(photo.url, 60 * 60); // 1 hour
+        return { ...photo, signedUrl: data?.signedUrl };
+      })
+    );
+    return signedPhotos;
+  };
 
   const fetchPhotos = async () => {
     setLoading(true);
@@ -35,7 +52,8 @@ export default function SettingsPage() {
       .select("id, url")
       .eq("user_id", user.id)
       .order("created_at", { ascending: true });
-    setPhotos(data || []);
+    const signedPhotos = await getSignedUrls(data || []);
+    setPhotos(signedPhotos);
     setLoading(false);
   };
 
@@ -75,15 +93,10 @@ export default function SettingsPage() {
       setUploading(false);
       return;
     }
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from("profile-photos")
-      .getPublicUrl(filePath);
-    const publicUrl = urlData?.publicUrl;
-    // Save to DB
+    // Save just the file path to DB
     const { error: dbError } = await supabase.from("profile_photos").insert({
       user_id: user.id,
-      url: publicUrl,
+      url: filePath,
     });
     if (dbError) {
       setError(dbError.message);
@@ -97,13 +110,17 @@ export default function SettingsPage() {
   const handleDelete = async (photo: Photo) => {
     setError(null);
     // Remove from storage
-    const path = photo.url.split("/profile-photos/")[1];
-    if (path) {
-      await supabase.storage.from("profile-photos").remove([path]);
+    if (photo.url) {
+      await supabase.storage.from("profile-photos").remove([photo.url]);
     }
     // Remove from DB
     await supabase.from("profile_photos").delete().eq("id", photo.id);
     fetchPhotos();
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
   };
 
   return (
@@ -128,23 +145,45 @@ export default function SettingsPage() {
             <div className="flex gap-4 items-center">
               {photos.map((photo, i) => (
                 <div key={photo.id} className="relative group">
-                  <Image
-                    src={photo.url}
-                    alt={`Embarrassing ${i + 1}`}
-                    width={80}
-                    height={80}
-                    className="border-4 border-royal object-cover shadow-chess"
-                    style={{ borderRadius: 0 }}
-                  />
+                  {photo.signedUrl ? (
+                    <Image
+                      src={photo.signedUrl}
+                      alt={`Embarrassing ${i + 1}`}
+                      width={80}
+                      height={80}
+                      className="border-4 border-royal object-cover shadow-chess w-20 h-20"
+                      style={{ borderRadius: 0, objectFit: "cover" }}
+                    />
+                  ) : (
+                    <div
+                      className="w-20 h-20 flex items-center justify-center bg-gray-800 text-gray-400 border-4 border-royal shadow-chess"
+                      style={{ borderRadius: 0 }}
+                    >
+                      No Image
+                    </div>
+                  )}
                   <button
-                    className="absolute top-1 right-1 bg-jet border-2 border-lime p-1 text-lime hover:bg-royal shadow-chess transition font-header uppercase"
+                    className="absolute top-1 right-1 bg-jet border-2 border-red-600 p-1 text-red-600 hover:bg-red-600 hover:text-white shadow-chess transition font-header uppercase"
                     title="Delete"
                     style={{ borderRadius: 0 }}
                     onClick={() => handleDelete(photo)}
                     disabled={photos.length <= 1}
                   >
                     <span className="flex items-center gap-1">
-                      <span className="text-xl">♟️</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2.5}
+                        stroke="currentColor"
+                        className="w-5 h-5"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
                     </span>
                   </button>
                 </div>
@@ -211,32 +250,66 @@ export default function SettingsPage() {
             </div>
           </div>
           <button
-            className="ml-auto px-4 py-2 font-header uppercase tracking-widest bg-lime text-jet font-bold shadow-chess border-4 border-royal transition-all duration-150 hover:animate-jitter flex items-center gap-2"
+            className="ml-auto px-4 py-2 font-header uppercase tracking-widest bg-red-600 text-white font-bold shadow-chess border-4 border-royal transition-all duration-150 hover:animate-jitter flex items-center gap-2"
             style={{ borderRadius: 0 }}
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  "Are you sure you want to delete your account? This cannot be undone."
+                )
+              )
+                return;
+              const {
+                data: { user },
+              } = await supabase.auth.getUser();
+              if (!user) return;
+              // Delete all user data
+              await supabase
+                .from("profile_photos")
+                .delete()
+                .eq("user_id", user.id);
+              await supabase.from("goals").delete().eq("user_id", user.id);
+              // Sign out
+              await supabase.auth.signOut();
+              router.push("/");
+            }}
           >
-            <svg className="w-6 h-6" viewBox="0 0 48 48">
-              <g>
-                <path
-                  fill="#4285F4"
-                  d="M44.5 20H24v8.5h11.7C34.7 33.1 30.1 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c2.6 0 5 .8 7 2.3l6.4-6.4C33.5 5.1 28.9 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.6 20-21 0-1.3-.1-2.7-.3-4z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M6.3 14.7l7 5.1C15.5 16.1 19.4 13 24 13c2.6 0 5 .8 7 2.3l6.4-6.4C33.5 5.1 28.9 3 24 3 15.7 3 8.3 8.2 6.3 14.7z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M24 45c6.1 0 11.2-2 14.9-5.4l-6.9-5.7C29.7 35.5 27 36.5 24 36.5c-6.1 0-11.3-4.1-13.2-9.6l-7 5.4C8.3 39.8 15.7 45 24 45z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M44.5 20H24v8.5h11.7c-1.2 3.2-4.7 7-11.7 7-6.6 0-12-5.4-12-12s5.4-12 12-12c2.6 0 5 .8 7 2.3l6.4-6.4C33.5 5.1 28.9 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.6 20-21 0-1.3-.1-2.7-.3-4z"
-                />
-              </g>
+            <svg
+              className="w-6 h-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 6h18M9 6v12a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2V6" />
+              <path d="M10 11v6m4-6v6" />
             </svg>
-            Disconnect Google
+            Delete Account
           </button>
         </section>
+        <div className="flex justify-end mt-4">
+          <button
+            className="px-4 py-2 font-header uppercase tracking-widest bg-lime text-jet font-bold shadow-chess border-4 border-royal transition-all duration-150 hover:animate-jitter flex items-center gap-2"
+            style={{ borderRadius: 0 }}
+            onClick={handleLogout}
+          >
+            <svg
+              className="w-5 h-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M17 16l4-4m0 0l-4-4m4 4H7" />
+              <path d="M3 12h4" />
+            </svg>
+            Logout
+          </button>
+        </div>
       </div>
     </AuthGuard>
   );
