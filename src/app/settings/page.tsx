@@ -25,6 +25,10 @@ export default function SettingsPage() {
     email: string;
     avatar: string;
   } | null>(null);
+  const [instaUsername, setInstaUsername] = useState<string>("");
+  const [instaEdit, setInstaEdit] = useState(false);
+  const [instaLoading, setInstaLoading] = useState(false);
+  const [instaMsg, setInstaMsg] = useState<string | null>(null);
 
   // Helper to get signed URLs for all photos
   const getSignedUrls = async (photos: Photo[]) => {
@@ -68,6 +72,13 @@ export default function SettingsPage() {
         email: user.email || user.user_metadata?.email || "",
         avatar: user.user_metadata?.avatar_url || "/mock/avatar.jpg",
       });
+      // Fetch Instagram username
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("instagram_username")
+        .eq("id", user.id)
+        .single();
+      setInstaUsername(profile?.instagram_username || "");
     };
     fetchUserInfo();
     // eslint-disable-next-line
@@ -260,6 +271,74 @@ export default function SettingsPage() {
                 </div>
                 <div className="text-royal font-header uppercase text-xs">
                   {userInfo.email}
+                </div>
+                <div className="mt-2">
+                  <span className="font-header text-xs text-lime uppercase mr-2">
+                    Instagram:
+                  </span>
+                  {instaEdit ? (
+                    <>
+                      <input
+                        type="text"
+                        value={instaUsername}
+                        onChange={(e) => setInstaUsername(e.target.value)}
+                        className="p-1 bg-black text-lime border-2 border-royal font-body mr-2"
+                        style={{ borderRadius: 0 }}
+                      />
+                      <button
+                        className="px-2 py-1 font-header uppercase bg-lime text-jet border-2 border-royal font-bold hover:bg-royal hover:text-lime transition"
+                        style={{ borderRadius: 0 }}
+                        disabled={instaLoading}
+                        onClick={async () => {
+                          setInstaLoading(true);
+                          setInstaMsg(null);
+                          const {
+                            data: { user },
+                          } = await supabase.auth.getUser();
+                          if (!user) return;
+                          const { error } = await supabase
+                            .from("profiles")
+                            .upsert({
+                              id: user.id,
+                              instagram_username: instaUsername,
+                            });
+                          setInstaLoading(false);
+                          setInstaEdit(false);
+                          setInstaMsg(error ? "Failed to save." : "Saved!");
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="ml-2 px-2 py-1 font-header uppercase bg-black text-lime border-2 border-royal hover:bg-royal hover:text-black transition"
+                        style={{ borderRadius: 0 }}
+                        onClick={() => setInstaEdit(false)}
+                        disabled={instaLoading}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-header text-xs text-white">
+                        {instaUsername || (
+                          <span className="text-gray-500">(not set)</span>
+                        )}
+                      </span>
+                      <button
+                        className="ml-2 px-2 py-1 font-header uppercase bg-lime text-jet border-2 border-royal font-bold hover:bg-royal hover:text-lime transition"
+                        style={{ borderRadius: 0 }}
+                        onClick={() => setInstaEdit(true)}
+                      >
+                        Edit
+                      </button>
+                    </>
+                  )}
+                  {instaMsg && (
+                    <span className="ml-2 text-xs text-lime font-header">
+                      {instaMsg}
+                    </span>
+                  )}
                 </div>
               </div>
             </>

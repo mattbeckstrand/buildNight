@@ -181,6 +181,16 @@ export default function DashboardPage() {
     setCheckInId(null);
   };
 
+  // Split goals into active, completed, missed
+  const now = new Date();
+  const activeGoals = goals.filter(
+    (g) => !g.checked_in_datetime && new Date(g.due_datetime) > now
+  );
+  const completedGoals = goals.filter((g) => g.checked_in_datetime);
+  const missedGoals = goals.filter(
+    (g) => !g.checked_in_datetime && new Date(g.due_datetime) <= now
+  );
+
   return (
     <AuthGuard>
       {userId && (
@@ -201,13 +211,13 @@ export default function DashboardPage() {
               <div className="flex justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-royal"></div>
               </div>
-            ) : goals.length === 0 ? (
+            ) : activeGoals.length === 0 ? (
               <div className="text-center text-royal text-lg font-header uppercase">
-                No goals yet. Add one to get started!
+                No active goals. Add one to get started!
               </div>
             ) : (
               <div className="space-y-6">
-                {goals.map((goal) => (
+                {activeGoals.map((goal) => (
                   <div
                     key={goal.id}
                     className="bg-jet border-4 border-royal shadow-chess p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -273,6 +283,70 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
+            {/* Goal History Section */}
+            <div className="mt-12">
+              <h3 className="text-2xl font-header uppercase text-royal mb-4">
+                Goal History
+              </h3>
+              {completedGoals.length === 0 && missedGoals.length === 0 ? (
+                <div className="text-center text-royal text-base font-header uppercase">
+                  No goal history yet.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {completedGoals.map((goal) => (
+                    <div
+                      key={goal.id}
+                      className="bg-jet border-4 border-lime shadow-chess p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                      style={{ borderRadius: 0 }}
+                    >
+                      <div>
+                        <h4 className="text-lg font-header uppercase text-lime">
+                          {goal.title}
+                        </h4>
+                        <p className="text-white font-body text-sm mb-1">
+                          {goal.description}
+                        </p>
+                        <p className="text-xs text-royal font-header uppercase">
+                          Due: {formatDue(goal.due_datetime)}
+                        </p>
+                        <p className="text-xs text-lime font-header uppercase">
+                          Checked in: {formatDue(goal.checked_in_datetime!)}
+                        </p>
+                      </div>
+                      <span className="font-header text-lime uppercase">
+                        Completed
+                      </span>
+                    </div>
+                  ))}
+                  {missedGoals.map((goal) => (
+                    <div
+                      key={goal.id}
+                      className="bg-jet border-4 border-red-600 shadow-chess p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                      style={{ borderRadius: 0 }}
+                    >
+                      <div>
+                        <h4 className="text-lg font-header uppercase text-red-500">
+                          {goal.title}
+                        </h4>
+                        <p className="text-white font-body text-sm mb-1">
+                          {goal.description}
+                        </p>
+                        <p className="text-xs text-royal font-header uppercase">
+                          Due: {formatDue(goal.due_datetime)}
+                        </p>
+                        <p className="text-xs text-red-500 font-header uppercase">
+                          Missed
+                        </p>
+                      </div>
+                      <span className="font-header text-red-500 uppercase">
+                        Missed
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               className="fixed bottom-8 right-8 z-30 px-8 py-4 font-header text-lg uppercase tracking-widest bg-royal text-lime font-bold shadow-chess border-4 border-lime transition-all duration-150 hover:animate-jitter flex items-center gap-2"
               style={{ borderRadius: 0 }}
