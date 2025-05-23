@@ -13,12 +13,6 @@ interface Photo {
   signedUrl?: string;
 }
 
-const mockGoogleAccount = {
-  displayName: "Goal Getter",
-  email: "goal.getter@gmail.com",
-  avatar: "/mock/avatar.jpg",
-};
-
 export default function SettingsPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +20,11 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const [userInfo, setUserInfo] = useState<{
+    name: string;
+    email: string;
+    avatar: string;
+  } | null>(null);
 
   // Helper to get signed URLs for all photos
   const getSignedUrls = async (photos: Photo[]) => {
@@ -59,6 +58,18 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchPhotos();
+    const fetchUserInfo = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      setUserInfo({
+        name: user.user_metadata?.full_name || user.email || "",
+        email: user.email || user.user_metadata?.email || "",
+        avatar: user.user_metadata?.avatar_url || "/mock/avatar.jpg",
+      });
+    };
+    fetchUserInfo();
     // eslint-disable-next-line
   }, []);
 
@@ -233,22 +244,26 @@ export default function SettingsPage() {
           className="bg-jet border-4 border-royal shadow-chess p-6 flex items-center gap-4"
           style={{ borderRadius: 0 }}
         >
-          <Image
-            src={mockGoogleAccount.avatar}
-            alt="Google avatar"
-            width={48}
-            height={48}
-            className="border-4 border-royal shadow-chess"
-            style={{ borderRadius: 0 }}
-          />
-          <div>
-            <div className="font-header text-lime uppercase tracking-widest">
-              {mockGoogleAccount.displayName}
-            </div>
-            <div className="text-royal font-header uppercase text-xs">
-              {mockGoogleAccount.email}
-            </div>
-          </div>
+          {userInfo && (
+            <>
+              <Image
+                src={userInfo.avatar}
+                alt="Google avatar"
+                width={48}
+                height={48}
+                className="border-4 border-royal shadow-chess"
+                style={{ borderRadius: 0 }}
+              />
+              <div>
+                <div className="font-header text-lime uppercase tracking-widest">
+                  {userInfo.name}
+                </div>
+                <div className="text-royal font-header uppercase text-xs">
+                  {userInfo.email}
+                </div>
+              </div>
+            </>
+          )}
           <button
             className="ml-auto px-4 py-2 font-header uppercase tracking-widest bg-red-600 text-white font-bold shadow-chess border-4 border-royal transition-all duration-150 hover:animate-jitter flex items-center gap-2"
             style={{ borderRadius: 0 }}
