@@ -1,4 +1,5 @@
 "use client";
+import UserInfo from "@/components/UserInfo";
 import { supabase } from "@/utils/supabaseClient";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -26,13 +27,13 @@ export default function ClientHeader() {
           Don't get roasted. Check in!
         </span>
       </Link>
-      <nav className="flex gap-4 text-royal font-header text-sm uppercase">
+      <nav className="flex gap-4 text-royal font-header text-sm uppercase items-center">
         <a href="/dashboard" className="hover:text-lime transition-colors">
           Dashboard
         </a>
-        <a href="/settings" className="hover:text-lime transition-colors">
-          Settings
-        </a>
+        <div className="ml-4 flex items-center">
+          <UserInfo compact />
+        </div>
       </nav>
     </header>
   );
