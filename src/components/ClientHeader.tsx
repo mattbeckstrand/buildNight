@@ -16,7 +16,7 @@ export default function ClientHeader() {
     <header className="sticky top-0 z-20 w-full bg-jet border-b-4 border-royal shadow-chess py-3 px-4 flex items-center justify-between">
       <Link href={href} className="flex items-center gap-3 group">
         <img
-          src="/checkmate.png"
+          src="/check-mate-logo.svg"
           alt="CheckMate Logo"
           className="h-10 w-10 group-hover:scale-105 transition-transform"
         />

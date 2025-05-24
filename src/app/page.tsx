@@ -20,7 +20,7 @@ export default function Home() {
     <main className="min-h-screen flex flex-col items-center justify-center bg-jet p-4">
       <div className="max-w-xl w-full text-center space-y-8">
         <Image
-          src="/checkmate.png"
+          src="/check-mate-logo.svg"
           alt="CheckMate Logo"
           width={80}
           height={80}
